@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+            body {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                font-family: Arial, Helvetica, sans-serif;
+            }
+            table {
+                border-collapse: collapse;
+                width: 80%;
+                margin-top: 20px;
+            }
+
+            th, td {
+                text-align: left;
+                padding: 12px;
+            }
+
+            tr:nth-child(even){background-color: #f2f2f2}
+
+            th {
+                background-color: #3a62cf;
+                color: white;
+            }
+
+            .form {
+                margin-top: 20px;
+                justify-self: center ;
+                width: 50%;
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                align-self: flex-start;
+                margin-left: 110px;
+            }
+
+            .input {
+                height: 30px;
+            }
+
+            .dropdown {
+                width: 75px;
+                height: 35px;
+            }
+            .inputs {
+                width: 60%;
+                display: flex;
+                justify-content: space-around;
+            }
+            .user {
+                margin-top: 20px;
+                width: 10%;
+                display: flex;
+                justify-content: space-around;
+                align-self: center;
+            }
+            h2 {
+                margin-top: 70px;
+            }
+            .buttons {
+                display: flex;
+                width: 20%;
+                justify-content: space-around;
+                margin-top: 50px;
+            }
+    </style>
+</head>
+<body>
+
+    <div class="user">
+        <p>Current User:</p><p id="userId"></p>
+    </div>
+    <form action="/post" method="post" class="form">
+        <h3>Create a new wish:</h3>
+        <div class="inputs">
+            <input type="text" name="description" placeholder="Enter a Description" class="input"/>
+            <input type="hidden" name="user_id" id="user_id" value = "${user_id}"/>
+            <select name="access_level" class="input dropdown">
+                <option value="private">private</option>
+                <option value="public">public</option>
+                <option value="friends">friends</option>
+            </select>
+            <input type="submit" value="Create Wish">
+        </div>
+    </form>
+    <h2>Wishes</h2>
+    <table>
+        <tr><th>Description</th><th>Access Level</th><th>User Id</th></tr> 
+
+        {{#each wishes}}
+        <div>
+            <tr>
+                <td>Description: {{ this.description }}</td>
+                <td>Access Level: {{ this.access_level }}</td>
+                <td>User ID: {{ this.user_id }}</td>
+            </tr>
+        </div>
+        {{else}}
+        <p>No wishes made</p>
+        {{/each}}
+    </table>
+    <div class="buttons">
+        <form method="post" action="/logout"><input type="submit" value="Sign Out"/></form>
+        <form method="get" action="/friendships"><input type="submit" value="Friendships"/></form>
+    </div>
+</body>
+<script>
+    let id = document.getElementById("userId");
+    let cookie = document.cookie;
+
+    let list = cookie.split("=")
+    id.innerHTML = list[1];
+</script>
+</html>
