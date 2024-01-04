@@ -53,7 +53,7 @@ pub fn create_user(jar: &CookieJar<'_>, user: Form<User>) -> Template {
         .expect("Error saving new user");
 
     let session_id = user.user_id.to_string();
-    jar.add(("user_id", session_id.clone()));
+    jar.add(("user_id", session_id.clone())); //add user_id to cookies
 
     Template::render("wishes", context! {})
 }
@@ -92,7 +92,7 @@ pub fn login(jar: &CookieJar<'_>, user: Form<User>) -> Template {
 
 #[post("/logout")]
 pub fn logout(jar: &CookieJar<'_>) -> Template {
-    jar.remove("user_id");
+    jar.remove("user_id"); //removes cookies
 
     Template::render("home", context! {})
 }
@@ -128,7 +128,7 @@ pub fn get_wishes(user_session: UserSession) -> Template {
 
     let user_token = &user_session.user_token;
 
-    // retrieves list of users' friends
+    // retrieves vector of user's friends
     let friendships = self::schema::friendships::dsl::friendships
         .filter(status.eq("Accepted"))
         .filter(user_one.eq(user_token))
@@ -136,6 +136,7 @@ pub fn get_wishes(user_session: UserSession) -> Template {
         .load::<Friendship>(connection)
         .expect("Error loading friendships");
 
+    //creates vector of user's friends' ids
     let mut friend_ids:Vec<String> = Vec::new();
 
     for i in &friendships {
@@ -144,8 +145,8 @@ pub fn get_wishes(user_session: UserSession) -> Template {
     }
 
     let results = self::schema::wishes::dsl::wishes
-        .filter(user_id.eq(user_token))
-        .or_filter(access_level.eq("public"))
+        .filter(user_id.eq(user_token)) 
+        .or_filter(access_level.eq("public")) 
         .or_filter((user_id.eq_any(friend_ids)).and(access_level.eq("friends")))
         .load::<Wish>(connection)
         .expect("Error loading wishes");
@@ -184,6 +185,7 @@ pub fn create_friendship_request(friendship: Form<FriendshipDto>, user_session: 
 
     let user_token = user_session.user_token;
 
+    // checks to see if requested user exists
     let requested_user = self::schema::users::dsl::users
         .filter(user_id.eq(friendship.user_two.to_string()))
         .load::<User>(connection)
@@ -219,7 +221,7 @@ pub fn change_friendship_status(friendship: Form<FriendshipDto>, user_session: U
     let connection = &mut establish_connection_pg();
 
     diesel::update(friendships)
-        .filter((user_one.eq(friendship.user_one.to_string())).and(user_two.eq(friendship.user_two.to_string())))
+        .filter((user_one.eq(friendship.user_one.to_string())).and(user_two.eq(friendship.user_two.to_string()))) //matches to friendship in table
         .set(status.eq(&friendship.status))
         .execute(connection)
         .expect("Error updating status");

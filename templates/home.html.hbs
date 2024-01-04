@@ -7,17 +7,44 @@
     <style>
         body {
             font-family: Arial, Helvetica, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 400px;
+        }
+        .form {
+            display: flex;
+            flex-direction: column;
+            width: 20%;
+            justify-content: center;
+        }
+        .input {
+            height: 20px;
+            padding: 5px;
+            margin: 5px;
+            text-align: center;
+        }
+        div {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+        } 
+        
+        h2 {
+            width: 20%;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <h1>User Portal</h1>
-    <form method="post">
-        <input type="text" name="user_id" placeholder="Enter id"/>
-        <input type="text" name="name" placeholder="Enter Name"/>
-        <input type="text" name="username" placeholder="Enter username"/>
+    <h2>User Portal</h2>
+    <form method="post" class="form">
+        <input type="text" class="input" name="user_id" placeholder="Enter id"/>
+        <input type="text" class="input" name="name" placeholder="Enter Name"/>
+        <input type="text" class="input" name="username" placeholder="Enter username"/>
         <div>
-            <input type="submit" formaction="/register" value="Register" />
+            <input type="submit" formaction="/register" value="Register"/>
             <input type="submit" formaction="/login" value="Login">
         </div>
     </form>

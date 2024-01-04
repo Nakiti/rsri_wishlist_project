@@ -133,7 +133,7 @@
     let userOne = document.getElementById("user_one")
     let cookie = document.cookie;
 
-    let list = cookie.split("=")
+    let list = cookie.split("=") // gets user id
     
     id.innerHTML = list[1]
     userOne.value = list[1]
