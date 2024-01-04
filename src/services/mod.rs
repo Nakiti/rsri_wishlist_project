@@ -131,8 +131,7 @@ pub fn get_wishes(user_session: UserSession) -> Template {
     // retrieves vector of user's friends
     let friendships = self::schema::friendships::dsl::friendships
         .filter(status.eq("Accepted"))
-        .filter(user_one.eq(user_token))
-        .or_filter(user_two.eq(user_token))
+        .filter((user_one.eq(user_token)).or(user_two.eq(user_token)))
         .load::<Friendship>(connection)
         .expect("Error loading friendships");
 
@@ -143,6 +142,8 @@ pub fn get_wishes(user_session: UserSession) -> Template {
         friend_ids.push(i.user_one.to_string());
         friend_ids.push(i.user_two.to_string());
     }
+
+    println!("{:?}", friend_ids);
 
     let results = self::schema::wishes::dsl::wishes
         .filter(user_id.eq(user_token)) 
