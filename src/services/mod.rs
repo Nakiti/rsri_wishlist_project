@@ -3,6 +3,7 @@ extern crate rocket;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use dotenvy::dotenv;
+use rocket::form::validate::eq;
 use rocket::form::Form;
 use rocket::http::CookieJar;
 use rocket::response::Debug;
@@ -15,6 +16,7 @@ use crate::schema::wishes::access_level;
 use rocket_dyn_templates::{context, Template};
 use crate::schema::{self};
 use std::env;
+use rdiesel::{select_list};
 
 
 
@@ -65,7 +67,7 @@ pub fn login(jar: &CookieJar<'_>, user: Form<User>) -> Template {
     use self::models::User;
     use self::schema::users::username;
 
-    let connection = &mut establish_connection_pg();
+    let connection: &mut PgConnection = &mut establish_connection_pg();
 
     // checks to see if user exists
     let is_user = self::schema::users::dsl::users
@@ -119,6 +121,10 @@ pub fn create_wish(wish: Form<WishDto>, user_session: UserSession) -> Template {
     get_wishes(user_session)
 }
 
+impl rdiesel::Expr<Friendship, String> for schema::friendships::status {}
+impl rdiesel::Expr<Friendship, String> for schema::friendships::user_one {}
+impl rdiesel::Expr<Friendship, String> for schema::friendships::user_two {}
+
 #[get("/")]
 pub fn get_wishes(user_session: UserSession) -> Template {
     use self::models::Wish;
@@ -127,6 +133,17 @@ pub fn get_wishes(user_session: UserSession) -> Template {
     let connection = &mut establish_connection_pg();
 
     let user_token = &user_session.user_token;
+    let q1 = rdiesel::Expr::eq(status, "Accepted");
+    let q2 = rdiesel::Expr::eq(user_one, user_token);
+    let q3 = rdiesel::Expr::eq(user_two, user_token);
+    let q4 = rdiesel::Expr::or(q2, q3);
+    let q5 = rdiesel::Expr::and(q1, q5);
+    /* 
+    let q = status.eq("Accepted")
+            .and(user_one.eq(user_token)
+                 .or(user_two.eq(user_token)))
+     */
+    let friendships = rdiesel::select_list(connection, q5);
 
     // retrieves vector of user's friends
     let friendships = self::schema::friendships::dsl::friendships

@@ -8,7 +8,6 @@ use rocket::http::Status;
 use rocket::FromForm;
 
 
-
 #[derive(Queryable, Insertable, Serialize, Deserialize, FromForm)]
 #[diesel(table_name = users)]
 pub struct User {
