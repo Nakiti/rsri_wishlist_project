@@ -1,13 +1,20 @@
-use crate::schema::{users, wishes, friendships};
+use crate::schema::{self, friendships, users, wishes};
 
-use diesel::prelude::*;
+use diesel::associations::HasTable;
+use diesel::{dsl, prelude::*};
 use serde::{Serialize, Deserialize};
 use rocket::request::{FromRequest, Outcome};
 use rocket::Request;
 use rocket::http::Status;
 use rocket::FromForm;
 
+impl HasTable for User {
+    type Table = crate::schema::users::table;
 
+    fn table() -> Self::Table {
+        crate::schema::users::table
+    }
+}
 #[derive(Queryable, Insertable, Serialize, Deserialize, FromForm)]
 #[diesel(table_name = users)]
 pub struct User {
@@ -24,6 +31,13 @@ pub struct UserDto {
     pub username: String
 }
 
+impl HasTable for Wish {
+    type Table = crate::schema::wishes::table;
+
+    fn table() -> Self::Table {
+        crate::schema::wishes::table
+    }
+}
 #[derive(Queryable, Insertable, Serialize, Deserialize, Associations)]
 #[diesel(belongs_to(User))]
 #[diesel(table_name = wishes)]
@@ -34,6 +48,13 @@ pub struct Wish {
     pub user_id: String
 }
 
+impl HasTable for WishDto {
+    type Table = crate::schema::wishes::table;
+
+    fn table() -> Self::Table {
+        crate::schema::wishes::table
+    }
+}
 #[derive(Queryable, Insertable, Serialize, Deserialize, Associations, FromForm)]
 #[diesel(belongs_to(User))]
 #[diesel(table_name = wishes)]
@@ -43,6 +64,13 @@ pub struct WishDto {
     pub user_id: String
 }
 
+impl HasTable for Friendship {
+    type Table = crate::schema::friendships::table;
+
+    fn table() -> Self::Table {
+        crate::schema::friendships::table
+    }
+}
 #[derive(Queryable, Insertable, Serialize, Deserialize, FromForm)]
 #[diesel(table_name = friendships)]
 pub struct Friendship {

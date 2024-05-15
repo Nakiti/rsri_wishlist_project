@@ -2,21 +2,22 @@ extern crate diesel;
 extern crate rocket;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+// use diesel::row::Field;
 use dotenvy::dotenv;
-use rocket::form::validate::eq;
+// use rocket::form::validate::eq;
 use rocket::form::Form;
 use rocket::http::CookieJar;
 use rocket::response::Debug;
 // use rocket::serde::json::Json;
 use rocket::{get, post};
-use crate::models::{self, User, UserSession, WishDto, Friendship, FriendshipDto};
+use crate::models::{self, User, UserSession, WishDto, Wish, Friendship, FriendshipDto};
 use crate::schema::friendships::{user_one, user_two, status};
 use crate::schema::users::user_id;
 use crate::schema::wishes::access_level;
 use rocket_dyn_templates::{context, Template};
 use crate::schema::{self};
 use std::env;
-use rdiesel::{select_list};
+use rdiesel::{select_list, update_where, Expr, Field};
 
 // connects to database
 pub fn establish_connection_pg() -> PgConnection {
@@ -57,6 +58,8 @@ pub fn create_user(jar: &CookieJar<'_>, user: Form<User>) -> Template {
     Template::render("wishes", context! {})
 }
 
+impl rdiesel::Expr::<User, String> for schema::users::username {}
+
 #[post("/login", format="form", data="<user>")]
 pub fn login(jar: &CookieJar<'_>, user: Form<User>) -> Template {
     use self::models::Wish;
@@ -67,10 +70,13 @@ pub fn login(jar: &CookieJar<'_>, user: Form<User>) -> Template {
     let connection: &mut PgConnection = &mut establish_connection_pg();
 
     // checks to see if user exists
-    let is_user = self::schema::users::dsl::users
-        .filter(username.eq(user.username.to_string()))
-        .load::<User>(connection)
-        .expect("Error loading users");
+    let user_q1 = rdiesel::Expr::eq(username, user.username.to_string());
+    let is_user = rdiesel::select_list(connection, user_q1).expect("Error retrieving user");
+
+    // let is_user = self::schema::users::dsl::users
+    //     .filter(username.eq(user.username.to_string()))
+    //     .load::<User>(connection)
+    //     .expect("Error loading users");
 
     if is_user.is_empty() {
         Template::render("home", context! {})
@@ -79,11 +85,14 @@ pub fn login(jar: &CookieJar<'_>, user: Form<User>) -> Template {
         jar.add(("user_id", session_user_id.clone()));
 
         println!("{}", session_user_id);
-    
-        let results = self::schema::wishes::dsl::wishes
-            .filter(user_id.eq(session_user_id))
-            .load::<Wish>(connection)
-            .expect("Error loading posts");
+        
+        let results_q1 = rdiesel::Expr::eq(user_id, session_user_id.to_string());
+        let results = rdiesel::select_list(connection, results_q1).expect("Error retrieving results");
+
+        // let results = self::schema::wishes::dsl::wishes
+        //     .filter(user_id.eq(session_user_id))
+        //     .load::<Wish>(connection)
+        //     .expect("Error loading posts");
     
         Template::render("wishes", context! {wishes: &results})
     }
@@ -122,6 +131,9 @@ impl rdiesel::Expr<Friendship, String> for schema::friendships::status {}
 impl rdiesel::Expr<Friendship, String> for schema::friendships::user_one {}
 impl rdiesel::Expr<Friendship, String> for schema::friendships::user_two {}
 
+impl rdiesel::Expr<Wish, String> for schema::wishes::user_id {}
+impl rdiesel::Expr<Wish, String> for schema::wishes::access_level {}
+
 #[get("/")]
 pub fn get_wishes(user_session: UserSession) -> Template {
     use self::models::Wish;
@@ -130,41 +142,43 @@ pub fn get_wishes(user_session: UserSession) -> Template {
     let connection = &mut establish_connection_pg();
 
     let user_token = &user_session.user_token;
-    let q1 = rdiesel::Expr::eq(status, "Accepted");
-    let q2 = rdiesel::Expr::eq(user_one, user_token);
-    let q3 = rdiesel::Expr::eq(user_two, user_token);
+    let q1 = rdiesel::Expr::eq(status, "Accepted".to_string());
+    let q2 = rdiesel::Expr::eq(user_one, user_token.to_string());
+    let q3 = rdiesel::Expr::eq(user_two, user_token.to_string());
     let q4 = rdiesel::Expr::or(q2, q3);
     let q5 = rdiesel::Expr::and(q1, q4);
-    /* 
-    let q = status.eq("Accepted")
-            .and(user_one.eq(user_token)
-                 .or(user_two.eq(user_token)))
-     */
     let friendships = rdiesel::select_list(connection, q5);
 
     // retrieves vector of user's friends
-    let friendships = self::schema::friendships::dsl::friendships
-        .filter(status.eq("Accepted"))
-        .filter((user_one.eq(user_token)).or(user_two.eq(user_token)))
-        .load::<Friendship>(connection)
-        .expect("Error loading friendships");
+    // let friendships = self::schema::friendships::dsl::friendships
+    //     .filter(status.eq("Accepted"))
+    //     .filter((user_one.eq(user_token)).or(user_two.eq(user_token)))
+    //     .load::<Friendship>(connection)
+    //     .expect("Error loading friendships");
 
     //creates vector of user's friends' ids
     let mut friend_ids:Vec<String> = Vec::new();
 
-    for i in &friendships {
+    for i in &friendships.expect("Error retrieving friendships") {
         friend_ids.push(i.user_one.to_string());
         friend_ids.push(i.user_two.to_string());
     }
 
-    println!("{:?}", friend_ids);
+    let wish_q1 = rdiesel::Expr::eq(user_id, user_token.to_string());
+    let wish_q2 = rdiesel::Expr::eq(access_level, "public".to_string());
+    let wish_q3 = rdiesel::Expr::eq_any(user_id, friend_ids);
+    let wish_q4 = rdiesel::Expr::eq(access_level, "friends".to_string());
+    let wish_q5 = rdiesel::Expr::and(wish_q3, wish_q4);
+    let wish_q6 = rdiesel::Expr::or(wish_q2, wish_q5);
+    let wish_q7 = rdiesel::Expr::or(wish_q1, wish_q6);
+    let results = rdiesel::select_list(connection, wish_q7).expect("Error retrieving wishes");
 
-    let results = self::schema::wishes::dsl::wishes
-        .filter(user_id.eq(user_token)) 
-        .or_filter(access_level.eq("public")) 
-        .or_filter((user_id.eq_any(friend_ids)).and(access_level.eq("friends")))
-        .load::<Wish>(connection)
-        .expect("Error loading wishes");
+    // let results = self::schema::wishes::dsl::wishes
+    //     .filter(user_id.eq(user_token)) 
+    //     .or_filter(access_level.eq("public")) 
+    //     .or_filter((user_id.eq_any(friend_ids)).and(access_level.eq("friends")))
+    //     .load::<Wish>(connection)
+    //     .expect("Error loading wishes");
 
     Template::render("wishes", context! {wishes: &results})
 }
@@ -182,36 +196,33 @@ pub fn get_friendships(user_session: UserSession) -> Template {
 
     let user_token = &user_session.user_token;
 
-    // let results_q1 = rdiesel::Expr::eq(user_one, user_token);
-    // let results_q2 = rdiesel::Expr::eq(user_two, user_token);
-    // let results_q3 = rdiesel::Expr::or(results_q1, results_q2);
-    
-    // let results = rdiesel::select_list(connection, results_q3);
+    let results_q1 = rdiesel::Expr::eq(user_one, user_token.to_string());
+    let results_q2 = rdiesel::Expr::eq(user_two, user_token.to_string());
+    let results_q3 = rdiesel::Expr::or(results_q1, results_q2);
+    let results = rdiesel::select_list(connection, results_q3).expect("Error retreiving results");
 
 
-    // let requests_q1 = rdiesel::Expr::eq(user_two, user_token);
-    // let requests_q2 = rdiesel::Expr::eq(status, "pending");
-    // let requests_q3 = rdiesel::Expr::and(requests_q1, requests_q2);
-
-    // let requests = rdiesel::select_list(connection, requests_q3);
+    let requests_q1 = rdiesel::Expr::eq(user_two, user_token.to_string());
+    let requests_q2 = rdiesel::Expr::eq(status, "pending".to_string());
+    let requests_q3 = rdiesel::Expr::and(requests_q1, requests_q2);
+    let requests = rdiesel::select_list(connection, requests_q3).expect("Error retrieving requets");
     
 
-    let results = self::schema::friendships::dsl::friendships
-        .filter(user_one.eq(user_token))
-        .or_filter(user_two.eq(user_token))
-        .load::<Friendship>(connection)
-        .expect("Error loading friendships");
+    // let results = self::schema::friendships::dsl::friendships
+    //     .filter(user_one.eq(user_token))
+    //     .or_filter(user_two.eq(user_token))
+    //     .load::<Friendship>(connection)
+    //     .expect("Error loading friendships");
 
-    let requests = self::schema::friendships::dsl::friendships
-        .filter((user_two.eq(user_token)).and(status.eq("pending")))
-        .load::<Friendship>(connection)
-        .expect("Error loading friendships");
+    // let requests = self::schema::friendships::dsl::friendships
+    //     .filter((user_two.eq(user_token)).and(status.eq("pending")))
+    //     .load::<Friendship>(connection)
+    //     .expect("Error loading friendships");
 
-    Template::render("friendships", context! {friendships: &results, requests: &requests})
+    Template::render("friendships", context! {friendships: results, requests: requests})
 }
 
 impl rdiesel::Expr<User, String> for schema::users::user_id {}
-// impl rdiesel::Expr<Friendships, String> for schema::friendships::user_one {}
 #[post("/post_friendship", format="form", data="<friendship>")]
 pub fn create_friendship_request(friendship: Form<FriendshipDto>, user_session: UserSession) -> Template {
     use self::schema::friendships::dsl::friendships;
@@ -221,13 +232,13 @@ pub fn create_friendship_request(friendship: Form<FriendshipDto>, user_session: 
     let user_token = user_session.user_token;
 
     // checks to see if requested user exists
-    // let user_q1 = rdiesel::Expr::eq(user_id, friendship.user_two.to_string());
-    // let requested_user = rdiesel::select_list(connection, user_q1);
+    let user_q1 = rdiesel::Expr::eq(user_id, friendship.user_two.to_string());
+    let requested_user = rdiesel::select_list(connection, user_q1).expect("Error retrieving users");
 
-    let requested_user = self::schema::users::dsl::users
-        .filter(user_id.eq(friendship.user_two.to_string()))
-        .load::<User>(connection)
-        .expect("Error retrieving user");
+    // let requested_user = self::schema::users::dsl::users
+    //     .filter(user_id.eq(friendship.user_two.to_string()))
+    //     .load::<User>(connection)
+    //     .expect("Error retrieving user");
 
     if requested_user.is_empty() {
         Template::render("friendships", context! {})
@@ -243,17 +254,21 @@ pub fn create_friendship_request(friendship: Form<FriendshipDto>, user_session: 
             .execute(connection)
             .expect("Friendship failed");
 
-        // let results_q1 = rdiesel::Expr::eq(user_one, user_token);
-        // let results = rdiesel::select_list(connection, results_q1);
+        let results_q1 = rdiesel::Expr::eq(user_one, user_token.to_string());
+        let results = rdiesel::select_list(connection, results_q1).expect("Error retrieving results");
 
-        let results = self::schema::friendships::dsl::friendships
-            .filter(user_one.eq(user_token))
-            .load::<Friendship>(connection)
-            .expect("Error loading friendships");
+        // let results = self::schema::friendships::dsl::friendships
+        //     .filter(user_one.eq(user_token))
+        //     .load::<Friendship>(connection)
+        //     .expect("Error loading friendships");
     
         Template::render("friendships", context! {friendships: &results})
     }
 }
+
+impl rdiesel::Field<Friendship, String> for schema::friendships::user_one {}
+impl rdiesel::Field<Friendship, String> for schema::friendships::user_two {}
+impl rdiesel::Field<Friendship, String> for schema::friendships::status {}
 
 #[post("/change_friendship", format="form", data="<friendship>")]
 pub fn change_friendship_status(friendship: Form<FriendshipDto>, user_session: UserSession) -> Template {
@@ -261,11 +276,17 @@ pub fn change_friendship_status(friendship: Form<FriendshipDto>, user_session: U
 
     let connection = &mut establish_connection_pg();
 
-    diesel::update(friendships)
-        .filter((user_one.eq(friendship.user_one.to_string())).and(user_two.eq(friendship.user_two.to_string()))) //matches to friendship in table
-        .set(status.eq(&friendship.status))
-        .execute(connection)
-        .expect("Error updating status");
+    let q1 = rdiesel::Expr::eq(user_one, friendship.user_one.to_string());
+    let q2 = rdiesel::Expr::eq(user_two, friendship.user_two.to_string());
+    let q3 = rdiesel::Expr::and(q1, q2);
+
+    let _ = update_where(connection, q3, status.assign(friendship.status.to_string()));
+
+    // diesel::update(friendships)
+    //     .filter((user_one.eq(friendship.user_one.to_string())).and(user_two.eq(friendship.user_two.to_string()))) //matches to friendship in table
+    //     .set(status.eq(&friendship.status))
+    //     .execute(connection)
+    //     .expect("Error updating status");
 
     get_friendships(user_session)
 }
