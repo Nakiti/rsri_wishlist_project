@@ -15,4 +15,7 @@ rdiesel = {git = "https://github.com/flux-rs/rdiesel.git"}
 winapi = { version = "0.3", features = ["winerror"] }
 
 [dependencies.rocket_dyn_templates]
+version = "0.1.0"
 features = ["handlebars"]
+
+
