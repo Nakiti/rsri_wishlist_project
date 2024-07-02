@@ -81,7 +81,7 @@
         <h3>Create a new wish:</h3>
         <div class="inputs">
             <input type="text" name="description" placeholder="Enter a Description" class="input"/>
-            <input type="hidden" name="user_id" id="user_id" value = "${user_id}"/>
+            <input type="hidden" name="user_id" id="user_id" value=""/>
             <select name="access_level" class="input dropdown">
                 <option value="private">private</option>
                 <option value="public">public</option>
@@ -117,5 +117,7 @@
 
     let list = cookie.split("=")
     id.innerHTML = list[1];
+
+    document.getElementById("user_id").value = parseInt(list[1], 10)
 </script>
 </html>

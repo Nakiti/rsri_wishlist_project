@@ -12,6 +12,7 @@ use rocket::FromForm;
 use crate::services::establish_connection_pg; 
 // use diesel::{Insertable, Queryable};
 use rdiesel::ContextImpl;
+use rocket::request;
 
 impl HasTable for User {
     type Table = crate::schema::users::table;
@@ -32,7 +33,7 @@ impl HasTable for User {
 #[derive(Queryable, Insertable, Serialize, Deserialize, FromForm, Selectable, Clone)]
 #[diesel(table_name = users)]
 pub struct User {
-    pub user_id: String,
+    pub user_id: i32,
     pub name: String,
     pub username: String
 }
@@ -40,7 +41,7 @@ pub struct User {
 #[derive(Queryable, Insertable, Serialize, Deserialize, FromForm)]
 #[diesel(table_name = users)]
 pub struct UserDto {
-    pub user_id: String,
+    pub user_id: i32,
     pub name: String,
     pub username: String
 }
@@ -59,7 +60,7 @@ pub struct Wish {
     pub wish_id: i32,
     pub description: String,
     pub access_level: String,
-    pub user_id: String
+    pub user_id: i32
 }
 
 impl HasTable for WishDto {
@@ -75,7 +76,7 @@ impl HasTable for WishDto {
 pub struct WishDto {
     pub description: String,
     pub access_level: String,
-    pub user_id: String
+    pub user_id: i32
 }
 
 impl HasTable for Friendship {
@@ -89,9 +90,9 @@ impl HasTable for Friendship {
 #[diesel(table_name = friendships)]
 pub struct Friendship {
     pub friendship_id: i32,
-    pub user_one: String,
-    pub user_two: String,
-    pub status: String
+    pub user_one: i32,
+    pub user_two: i32,
+    pub status: i32
 }
 
 impl HasTable for FriendshipDto {
@@ -104,9 +105,9 @@ impl HasTable for FriendshipDto {
 #[derive(Queryable, Insertable, Serialize, Deserialize, FromForm)]
 #[diesel(table_name = friendships)]
 pub struct FriendshipDto {
-    pub user_one: String,
-    pub user_two: String,
-    pub status: String
+    pub user_one: i32,
+    pub user_two: i32,
+    pub status: i32
 }
 
 
@@ -140,29 +141,26 @@ impl ContextImpl for UserSession {
 impl<'r> FromRequest<'r> for UserSession {
     type Error = ();
 
-    async fn from_request(req: &'r Request<'_>) -> Outcome<UserSession, Self::Error> {
-        let token = req.cookies().get("user_id").unwrap().value();
+    async fn from_request(req: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
+        use crate::schema::users;
 
-        let usr_token1 = token.to_string();
-
-        println!("Your id: {}", usr_token1);
+        let Some(user_id) = req
+            .cookies()
+            .get("user_id")
+            .and_then(|it| it.value().parse::<i32>().ok())
+        else {
+            return Outcome::Error((Status::Unauthorized, ()));
+        };
 
         let mut connection = establish_connection_pg();
-
-        if usr_token1.is_empty() {
-            Outcome::Error((Status::Unauthorized, ()))
-        } else {
-            // let session_user = UserSession {
-            //     user_token: usr_token1,
-            //     connection,
-            // };
-            let user = users::table
-                .filter(users::user_id.eq(usr_token1))
-                .first(&mut connection)
-                .ok()
-                .expect("Error");
-
-            Outcome::Success(UserSession {user, connection})
-        }
+        let Some(user) = users::table
+            .filter(users::user_id.eq(user_id))
+            .first(&mut connection)
+            .ok()
+        else {
+            return Outcome::Error((Status::Unauthorized, ()));
+        };
+        request::Outcome::Success(UserSession { connection, user })
     }
 }

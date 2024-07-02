@@ -1,17 +1,17 @@
 extern crate diesel;
 extern crate rocket;
 use diesel::pg::PgConnection;
-
 use dotenvy::dotenv;
 use rocket::form::Form;
 use rocket::http::CookieJar;
-use rocket::post;
+use rocket::{post, get};
 use crate::models::User;
 use rocket_dyn_templates::{context, Template};
 use crate::schema::{self};
 use std::env;
 use rdiesel::{select_list, Expr};
 use diesel::{RunQueryDsl, Connection};
+
 
 
 // connects to database
@@ -22,6 +22,12 @@ pub fn establish_connection_pg() -> PgConnection {
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
 
+// make userportal page
+#[get("/home")]
+pub fn home_page() -> Template {
+    Template::render("home", context! {})
+}
+
 #[post("/register", format="form", data = "<user>")]
 pub fn create_user(jar: &CookieJar<'_>, user: Form<User>) -> Template {
     use self::schema::users::dsl::*;
@@ -29,7 +35,7 @@ pub fn create_user(jar: &CookieJar<'_>, user: Form<User>) -> Template {
     let connection: &mut PgConnection = &mut establish_connection_pg();
 
     let new_user = User {
-        user_id: user.user_id.to_string(),
+        user_id: user.user_id,
         name: user.name.to_string(),
         username: user.username.to_string()
     };
@@ -39,8 +45,8 @@ pub fn create_user(jar: &CookieJar<'_>, user: Form<User>) -> Template {
         .execute(connection)
         .expect("Error saving new user");
 
-    let session_id = user.user_id.to_string();
-    jar.add(("user_id", session_id.clone())); //add user_id to cookies
+    let session_id = user.user_id;
+    jar.add(("user_id", session_id.to_string())); //add user_id to cookies
 
     Template::render("wishes", context! {})
 }
@@ -66,13 +72,13 @@ pub fn login(jar: &CookieJar<'_>, user: Form<User>) -> Template {
     if is_user.is_empty() {
         Template::render("home", context! {})
     } else {
-        let session_user_id = user.user_id.to_string();
-        jar.add(("user_id", session_user_id.clone()));
+        let session_user_id = user.user_id;
+        jar.add(("user_id", session_user_id.to_string()));
         // jar.add(("connection", connection));
 
         println!("{}", session_user_id);
         
-        let results_q1 = user_id.eq(session_user_id.to_string());
+        let results_q1 = user_id.eq(session_user_id);
         let results = select_list(connection, results_q1).expect("Error retrieving results");
 
         // let results = self::schema::wishes::dsl::wishes

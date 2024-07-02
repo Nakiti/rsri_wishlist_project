@@ -76,7 +76,7 @@
     <form action="/post_friendship" method="post" class="form">
         <h4><b>Create a Friendship: </b></h4>
         <input type="text" name="user_two" placeholder="Enter other user id" class="input"/>
-        <input type="hidden" name="status" value="pending"/>
+        <input type="hidden" name="status" id="status" value=""/>
         <input type="hidden" name="user_one" id="user_one" value=""/>
         <input type="submit" value="request" />
     </form>
@@ -109,8 +109,8 @@
                 <td>
                     <form action="/change_friendship" method="post">
                         <select name="status" id="">
-                            <option value="Accepted">Accept</option>
-                            <option value="Rejected">Reject</option>
+                            <option id="option1" value={{1}}>Accept</option>
+                            <option id="option2" value={{-1}}>Reject</option>
                         </select>
                         <input type="hidden" name="user_one" value={{ this.user_one }}>
                         <input type="hidden" name="user_two" value={{ this.user_two }}>
@@ -136,6 +136,9 @@
     let list = cookie.split("=") // gets user id
     
     id.innerHTML = list[1]
-    userOne.value = list[1]
+    userOne.value = parseInt(list[1], 10)
+    document.getElementById("status").value = parseInt(0, 10)
+    document.getElementById("option1").value = parseInt(1, 10)
+    document.getElementById("option2").value = parseInt(-1, 10)
 </script>
 </html>
